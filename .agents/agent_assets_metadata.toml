@@ -6,3 +6,51 @@ id = "YlteuKpRzIVGvV6BbrOQs"
 uri = "file://ScannerPro-Android.zip"
 type = "unspecified"
 title = "Scanner Pro – Android Project (APK-ready)"
+
+[[outputs]]
+id = "y9SpvLEK4VmcI8HLk4LCh"
+uri = "file://ScannerPro-Android-Final.zip"
+type = "unspecified"
+title = "Scanner Pro — Android Project (Final)"
+
+[[outputs]]
+id = "lg_olnDxuAAnD44nfDhOx"
+uri = "file://ScannerPro-PlayStore-Assets.zip"
+type = "unspecified"
+title = "Scanner Pro — Play Store Assets"
+
+[[outputs]]
+id = "DYqt7unLv0-FNP4ENGANs"
+uri = "file://attached_assets/icon-512x512.png"
+type = "image"
+title = "App Icon 512×512"
+
+[[outputs]]
+id = "OWpLjJ307s7OJB_V5uVKa"
+uri = "file://attached_assets/playstore-feature-graphic-1024x500.png"
+type = "image"
+title = "Feature Graphic 1024×500"
+
+[[outputs]]
+id = "kqYGN6msJ1o6ZeqmyKQ8o"
+uri = "file://attached_assets/screenshot-1-final.png"
+type = "image"
+title = "Screenshot 1 — Scanner"
+
+[[outputs]]
+id = "FlbbfVjuo6Lqn54DFDM48"
+uri = "file://attached_assets/screenshot-2-final.png"
+type = "image"
+title = "Screenshot 2 — Generate"
+
+[[outputs]]
+id = "F2DaKV5LNY7-e2Y0lYFKr"
+uri = "file://attached_assets/screenshot-3-final.png"
+type = "image"
+title = "Screenshot 3 — History"
+
+[[outputs]]
+id = "tDK-I7NaQZA2bxZrqjqkX"
+uri = "file://attached_assets/screenshot-4-final.png"
+type = "image"
+title = "Screenshot 4 — Saved"

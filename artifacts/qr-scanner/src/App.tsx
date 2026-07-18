@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
@@ -10,6 +11,7 @@ import FavoritesPage from "./pages/FavoritesPage";
 import { AdBanner } from "./components/AdBanner";
 import { AdInterstitial } from "./components/AdInterstitial";
 import { useAdMob } from "./hooks/use-admob";
+import { initAdMob } from "./lib/admob-native";
 
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -18,6 +20,11 @@ const queryClient = new QueryClient();
 function MainLayout() {
   const [location, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
+
+  // Initialise AdMob SDK on native builds (no-op on web)
+  useEffect(() => {
+    initAdMob().catch(console.warn);
+  }, []);
   
   const { 
     showInterstitial, 
