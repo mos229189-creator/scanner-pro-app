@@ -2,13 +2,12 @@ import { X } from "lucide-react";
 
 export function AdBanner() {
   // AdMob Banner — 320x50 standard banner
-  // Test ID (Android): ca-app-pub-3940256099942544/6300978111
-  // Test ID (iOS): ca-app-pub-3940256099942544/2934735716
-  // Replace with real IDs before publishing: https://apps.admob.com
+  // App ID:         ca-app-pub-4796587410639477~1906161927
+  // Banner Ad Unit: ca-app-pub-4796587410639477/2365472715
   //
   // In Capacitor native build, replace this component with:
   // import { AdMob, BannerAdOptions, BannerAdSize, BannerAdPosition } from '@capacitor-community/admob';
-  // AdMob.showBanner({ adId: 'YOUR_REAL_BANNER_ID', adSize: BannerAdSize.BANNER, position: BannerAdPosition.BOTTOM_CENTER });
+  // AdMob.showBanner({ adId: 'ca-app-pub-4796587410639477/2365472715', adSize: BannerAdSize.BANNER, position: BannerAdPosition.BOTTOM_CENTER });
 
   return (
     <div className="h-[50px] w-full bg-secondary/80 border-t border-border flex items-center justify-center shrink-0 z-20 relative">

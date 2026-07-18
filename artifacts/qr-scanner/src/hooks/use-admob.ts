@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
-// Interstitial Test ID (Android): ca-app-pub-3940256099942544/1033173712
-// Interstitial Test ID (iOS): ca-app-pub-3940256099942544/4411468910
-// Rewarded Test ID (Android): ca-app-pub-3940256099942544/5224354917
-// Rewarded Test ID (iOS): ca-app-pub-3940256099942544/1712485313
+// App ID:               ca-app-pub-4796587410639477~1906161927
+// Interstitial Ad Unit: ca-app-pub-4796587410639477/1052391042
+//
+// In Capacitor native build, pass the interstitial ID to AdMob.prepareInterstitial({ adId: '...' })
+// and AdMob.showInterstitial() on trigger.
 
 const INTERSTITIAL_THRESHOLD = 5;
 
