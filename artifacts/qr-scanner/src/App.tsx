@@ -2,11 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
-import { LanguageProvider, useLanguage } from "./context/LanguageContext";
-import { ScanLine, QrCode, History, Moon, Sun } from "lucide-react";
+import { ScanLine, QrCode, History, Moon, Sun, Star } from "lucide-react";
 import ScannerPage from "./pages/ScannerPage";
 import GeneratorPage from "./pages/GeneratorPage";
 import HistoryPage from "./pages/HistoryPage";
+import FavoritesPage from "./pages/FavoritesPage";
+import { AdBanner } from "./components/AdBanner";
+import { AdInterstitial } from "./components/AdInterstitial";
+import { useAdMob } from "./hooks/use-admob";
 
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -15,11 +18,18 @@ const queryClient = new QueryClient();
 function MainLayout() {
   const [location, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
-  const { t } = useLanguage();
+  
+  const { 
+    showInterstitial, 
+    showRewarded, 
+    handleInterstitialClose, 
+    handleRewardedClose 
+  } = useAdMob();
 
   const getActiveTab = () => {
     if (location === '/generator') return 'generator';
     if (location === '/history') return 'history';
+    if (location === '/favorites') return 'favorites';
     return 'scanner';
   };
 
@@ -28,10 +38,10 @@ function MainLayout() {
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-[480px] mx-auto bg-background text-foreground sm:border-x sm:border-border shadow-2xl overflow-hidden relative isolate sm:h-screen">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 h-14 border-b border-border bg-card/80 backdrop-blur-md z-20 shrink-0">
-        <div className="font-bold text-lg text-primary tracking-tight flex items-center gap-2">
-          <ScanLine className="w-5 h-5" />
-          QR & Barcode
+      <header className="flex items-center justify-between px-5 h-14 border-b border-white/5 bg-card/80 backdrop-blur-xl z-20 shrink-0">
+        <div className="font-bold text-lg text-foreground tracking-tight flex items-center gap-2">
+          <ScanLine className="w-5 h-5 text-primary" />
+          Scanner<span className="text-primary">Pro</span>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -58,6 +68,7 @@ function MainLayout() {
             <Switch location={location}>
               <Route path="/generator" component={GeneratorPage} />
               <Route path="/history" component={HistoryPage} />
+              <Route path="/favorites" component={FavoritesPage} />
               <Route path="/" component={ScannerPage} />
               <Route component={ScannerPage} />
             </Switch>
@@ -65,16 +76,11 @@ function MainLayout() {
         </AnimatePresence>
       </main>
 
-      {/* AdMob Placeholder */}
-      <div className="h-[50px] w-full bg-secondary/50 border-t border-border flex items-center justify-center shrink-0 z-20 relative">
-        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-          {t("Advertisement")}
-        </span>
-        {/* AdMob banner — replace with real ad unit in native build */}
-      </div>
+      {/* AdMob Banner */}
+      <AdBanner />
 
       {/* Bottom Tab Bar */}
-      <nav className="h-[68px] w-full bg-card border-t border-border flex justify-around items-center px-2 pb-safe shrink-0 z-20 relative">
+      <nav className="h-[68px] w-full bg-card border-t border-white/5 flex justify-around items-center px-2 pb-safe shrink-0 z-20 relative">
         <button
           onClick={() => setLocation("/")}
           className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${
@@ -84,7 +90,7 @@ function MainLayout() {
           <div className={`p-1.5 rounded-xl transition-colors ${activeTab === "scanner" ? "bg-primary/10" : ""}`}>
             <ScanLine className={`w-6 h-6 ${activeTab === "scanner" ? "fill-primary/10" : ""}`} />
           </div>
-          <span className="text-[10px] font-semibold">{t("Scanner")}</span>
+          <span className="text-[10px] font-bold tracking-wide">Scanner</span>
         </button>
 
         <button
@@ -96,7 +102,7 @@ function MainLayout() {
           <div className={`p-1.5 rounded-xl transition-colors ${activeTab === "generator" ? "bg-primary/10" : ""}`}>
             <QrCode className={`w-6 h-6 ${activeTab === "generator" ? "fill-primary/10" : ""}`} />
           </div>
-          <span className="text-[10px] font-semibold">{t("Generator")}</span>
+          <span className="text-[10px] font-bold tracking-wide">Generate</span>
         </button>
 
         <button
@@ -108,9 +114,31 @@ function MainLayout() {
           <div className={`p-1.5 rounded-xl transition-colors ${activeTab === "history" ? "bg-primary/10" : ""}`}>
             <History className={`w-6 h-6 ${activeTab === "history" ? "fill-primary/10" : ""}`} />
           </div>
-          <span className="text-[10px] font-semibold">{t("History")}</span>
+          <span className="text-[10px] font-bold tracking-wide">History</span>
+        </button>
+
+        <button
+          onClick={() => setLocation("/favorites")}
+          className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${
+            activeTab === "favorites" ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <div className={`p-1.5 rounded-xl transition-colors ${activeTab === "favorites" ? "bg-primary/10" : ""}`}>
+            <Star className={`w-6 h-6 ${activeTab === "favorites" ? "fill-primary/10" : ""}`} />
+          </div>
+          <span className="text-[10px] font-bold tracking-wide">Saved</span>
         </button>
       </nav>
+
+      {/* Interstitials */}
+      <AnimatePresence>
+        {showInterstitial && (
+          <AdInterstitial type="interstitial" onClose={handleInterstitialClose} />
+        )}
+        {showRewarded && (
+          <AdInterstitial type="rewarded" onClose={handleRewardedClose} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -119,14 +147,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <LanguageProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            <div className="min-h-[100dvh] bg-black/90 flex justify-center items-center">
-              <MainLayout />
-            </div>
-          </WouterRouter>
-          <Toaster />
-        </LanguageProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <div className="min-h-[100dvh] bg-black/90 flex justify-center items-center font-sans">
+            <MainLayout />
+          </div>
+        </WouterRouter>
+        <Toaster />
       </ThemeProvider>
     </QueryClientProvider>
   );

@@ -76,7 +76,9 @@
   },
   "dependencies": {
     "@types/qrcode.react": "^3.0.0",
+    "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
     "qrcode.react": "^4.2.0"
   }
 }
