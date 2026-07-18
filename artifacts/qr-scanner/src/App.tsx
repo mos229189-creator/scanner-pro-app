@@ -7,6 +7,7 @@ import { ScanLine, QrCode, History, Moon, Sun } from "lucide-react";
 import ScannerPage from "./pages/ScannerPage";
 import GeneratorPage from "./pages/GeneratorPage";
 import HistoryPage from "./pages/HistoryPage";
+
 import { AnimatePresence, motion } from "framer-motion";
 
 const queryClient = new QueryClient();
@@ -14,7 +15,7 @@ const queryClient = new QueryClient();
 function MainLayout() {
   const [location, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
 
   const getActiveTab = () => {
     if (location === '/generator') return 'generator';
@@ -33,13 +34,6 @@ function MainLayout() {
           QR & Barcode
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Toggle Language"
-          >
-            <span className="font-bold text-xs uppercase">{language}</span>
-          </button>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"

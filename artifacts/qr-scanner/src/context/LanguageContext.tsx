@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
 
-export type Language = "en" | "ar";
+interface LanguageContextType {
+  t: (key: string) => string;
+}
 
-type Translations = Record<string, string>;
-
-const enTranslations: Translations = {
+const translations: Record<string, string> = {
   Scanner: "Scanner",
   Generator: "Generator",
   History: "History",
@@ -23,68 +23,22 @@ const enTranslations: Translations = {
   "Camera permission denied": "Camera permission denied",
   "Switch Camera": "Switch Camera",
   Torch: "Torch",
-  "Advertisement": "Advertisement",
+  Advertisement: "Advertisement",
 };
 
-const arTranslations: Translations = {
-  Scanner: "الماسح الضوئي",
-  Generator: "المولّد",
-  History: "السجل",
-  "Scan Result": "نتيجة المسح",
-  Copy: "نسخ",
-  "Open URL": "فتح الرابط",
-  "Generate QR Code": "توليد رمز QR",
-  Download: "تحميل",
-  "Scan History": "سجل المسح",
-  "Clear All": "مسح الكل",
-  "No scans yet": "لا توجد عمليات مسح بعد",
-  "Enter text or URL...": "أدخل نصاً أو رابطاً...",
-  "Dark Mode": "الوضع الداكن",
-  "Light Mode": "الوضع الفاتح",
-  "Copied!": "تم النسخ!",
-  "Camera permission denied": "تم رفض إذن الكاميرا",
-  "Switch Camera": "تبديل الكاميرا",
-  Torch: "المصباح",
-  "Advertisement": "إعلان",
-};
-
-interface LanguageContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
-}
-
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const LanguageContext = createContext<LanguageContextType>({
+  t: (key) => translations[key] ?? key,
+});
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem("language");
-    return (saved as Language) || "en";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("language", language);
-    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
-  }, [language]);
-
-  const t = (key: string) => {
-    if (language === "ar") {
-      return arTranslations[key] || key;
-    }
-    return enTranslations[key] || key;
-  };
-
+  const t = (key: string) => translations[key] ?? key;
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ t }}>
       {children}
     </LanguageContext.Provider>
   );
 }
 
 export function useLanguage() {
-  const context = useContext(LanguageContext);
-  if (context === undefined) {
-    throw new Error("useLanguage must be used within a LanguageProvider");
-  }
-  return context;
+  return useContext(LanguageContext);
 }

@@ -4,7 +4,7 @@ import { useHistory } from "../hooks/use-history";
 import { toast } from "@/hooks/use-toast";
 
 export default function HistoryPage() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { history, clearHistory } = useHistory();
 
   const handleCopy = (text: string) => {
@@ -17,7 +17,7 @@ export default function HistoryPage() {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-US', {
+    return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
