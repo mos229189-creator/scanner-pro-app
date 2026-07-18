@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "YlteuKpRzIVGvV6BbrOQs"
+uri = "file://ScannerPro-Android.zip"
+type = "unspecified"
+title = "Scanner Pro – Android Project (APK-ready)"
