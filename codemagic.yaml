@@ -53,8 +53,19 @@ workflows:
       # ── 6. Build signed release APK + AAB ────────────────────────────────
       #    store.type=PKCS12 is required because the keystore was generated
       #    with OpenSSL (PKCS12 format), not the Java keytool JKS format
+      #    JAVA_HOME is set explicitly because java:21 in environment doesn't
+      #    always propagate into the Gradle daemon — we find the JDK 21 path
+      #    directly so Gradle uses the correct JDK regardless of system default.
       - name: Build Android release
         script: |
+          # Resolve Java 21 home — try common Codemagic/Ubuntu JDK paths
+          JAVA21=$(find /usr/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
+          [ -z "$JAVA21" ] && JAVA21=$(find /usr/local/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
+          [ -z "$JAVA21" ] && JAVA21=$(dirname $(dirname $(readlink -f $(which java))))
+          export JAVA_HOME="$JAVA21"
+          echo "Using JAVA_HOME: $JAVA_HOME"
+          java -version
+
           cd artifacts/qr-scanner/android
           chmod +x gradlew
           ./gradlew bundleRelease assembleRelease \
