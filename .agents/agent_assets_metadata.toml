@@ -60,3 +60,9 @@ id = "vzNZOoi0o45nc0yDDf3gb"
 uri = "file://CLOUD_BUILD_SETUP.md"
 type = "text"
 title = "Cloud Build Setup Guide"
+
+[[outputs]]
+id = "5D-iHZz7Qr-ggZeN4FO7p"
+uri = "file://scannerpro-release.keystore"
+type = "unspecified"
+title = "Scanner Pro — Release Keystore"
