@@ -20,7 +20,7 @@ workflows:
       # ── 1. Install pnpm ───────────────────────────────────────────────────
       - name: Install pnpm
         script: |
-          npm install -g pnpm@latest --force
+          npm install -g pnpm@9 --force
 
       # ── 2. Install workspace dependencies ────────────────────────────────
       - name: Install dependencies
