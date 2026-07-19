@@ -1,0 +1,71 @@
+workflows:
+  android-release:
+    name: Scanner Pro — Android Release
+    max_build_duration: 60
+    environment:
+      node: v20.17.0
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.scanpro.app"
+      groups:
+        # Create this group in Codemagic → Teams → Global variables & secrets
+        # Add these four variables to it (see CLOUD_BUILD_SETUP.md for values):
+        #   CM_KEYSTORE         — base64-encoded .jks file
+        #   CM_KEYSTORE_PASSWORD
+        #   CM_KEY_ALIAS
+        #   CM_KEY_PASSWORD
+        - keystore_credentials
+
+    scripts:
+      # ── 1. Install pnpm ───────────────────────────────────────────────────
+      - name: Enable pnpm
+        script: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      # ── 2. Install workspace dependencies ────────────────────────────────
+      - name: Install dependencies
+        script: |
+          pnpm install --frozen-lockfile
+
+      # ── 3. Build the web app (Vite) ───────────────────────────────────────
+      - name: Build web assets
+        script: |
+          cd artifacts/qr-scanner
+          PORT=3000 BASE_PATH=./ pnpm run build
+
+      # ── 4. Sync web assets into Android project ───────────────────────────
+      - name: Capacitor sync
+        script: |
+          cd artifacts/qr-scanner
+          npx cap sync android
+
+      # ── 5. Decode & write the keystore file ───────────────────────────────
+      - name: Set up keystore
+        script: |
+          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.jks
+
+      # ── 6. Build signed release APK + AAB ────────────────────────────────
+      - name: Build Android release
+        script: |
+          cd artifacts/qr-scanner/android
+          chmod +x gradlew
+          ./gradlew bundleRelease assembleRelease \
+            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.jks \
+            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
+
+    artifacts:
+      # APK — direct install / sideload
+      - artifacts/qr-scanner/android/app/build/outputs/apk/release/*.apk
+      # AAB — required for Play Store upload
+      - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
+
+    publishing:
+      email:
+        recipients:
+          - your@email.com        # ← replace with your email
+        notify:
+          success: true
+          failure: true

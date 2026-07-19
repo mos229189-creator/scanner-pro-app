@@ -11,7 +11,7 @@ title = "Scanner Pro – Android Project (APK-ready)"
 id = "y9SpvLEK4VmcI8HLk4LCh"
 uri = "file://ScannerPro-Android-Final.zip"
 type = "unspecified"
-title = "Scanner Pro — Android Project (Final)"
+title = "Scanner Pro — Android + Codemagic Build (Final)"
 
 [[outputs]]
 id = "lg_olnDxuAAnD44nfDhOx"
@@ -54,3 +54,9 @@ id = "tDK-I7NaQZA2bxZrqjqkX"
 uri = "file://attached_assets/screenshot-4-final.png"
 type = "image"
 title = "Screenshot 4 — Saved"
+
+[[outputs]]
+id = "vzNZOoi0o45nc0yDDf3gb"
+uri = "file://CLOUD_BUILD_SETUP.md"
+type = "text"
+title = "Cloud Build Setup Guide"
