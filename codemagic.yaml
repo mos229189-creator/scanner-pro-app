@@ -10,7 +10,7 @@ workflows:
       groups:
         # Create this group in Codemagic → Teams → Global variables & secrets
         # Add these four variables to it (see CLOUD_BUILD_SETUP.md for values):
-        #   CM_KEYSTORE         — base64-encoded .jks file
+        #   CM_KEYSTORE         — base64-encoded .keystore (PKCS12) file
         #   CM_KEYSTORE_PASSWORD
         #   CM_KEY_ALIAS
         #   CM_KEY_PASSWORD
@@ -23,9 +23,10 @@ workflows:
           npm install -g pnpm@9 --force
 
       # ── 2. Install workspace dependencies ────────────────────────────────
+      #    Use --no-frozen-lockfile so pnpm@9 doesn't reject the v10 lockfile
       - name: Install dependencies
         script: |
-          pnpm install --frozen-lockfile
+          pnpm install --no-frozen-lockfile
 
       # ── 3. Build the web app (Vite) ───────────────────────────────────────
       - name: Build web assets
@@ -34,26 +35,30 @@ workflows:
           PORT=3000 BASE_PATH=./ pnpm run build
 
       # ── 4. Sync web assets into Android project ───────────────────────────
+      #    Use local Capacitor CLI (avoids npx downloading a different version)
       - name: Capacitor sync
         script: |
           cd artifacts/qr-scanner
-          npx cap sync android
+          pnpm exec cap sync android
 
       # ── 5. Decode & write the keystore file ───────────────────────────────
       - name: Set up keystore
         script: |
-          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.jks
+          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
 
       # ── 6. Build signed release APK + AAB ────────────────────────────────
+      #    store.type=PKCS12 is required because the keystore was generated
+      #    with OpenSSL (PKCS12 format), not the Java keytool JKS format
       - name: Build Android release
         script: |
           cd artifacts/qr-scanner/android
           chmod +x gradlew
           ./gradlew bundleRelease assembleRelease \
-            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.jks \
+            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
             -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
+            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD \
+            -Pandroid.injected.signing.store.type=PKCS12
 
     artifacts:
       # APK — direct install / sideload
@@ -64,7 +69,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - your@email.com        # ← replace with your email
+          - mos229189@gmail.com
         notify:
           success: true
           failure: true
