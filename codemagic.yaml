@@ -3,7 +3,7 @@ workflows:
     name: Scanner Pro — Android Release
     max_build_duration: 60
     environment:
-      node: 22
+      node: 22.13.1
       java: 17
       vars:
         PACKAGE_NAME: "com.scanpro.app"
@@ -20,6 +20,8 @@ workflows:
       # ── 1. Install pnpm ───────────────────────────────────────────────────
       - name: Install pnpm
         script: |
+          nvm install 22 && nvm use 22
+          node --version
           npm install -g pnpm@9 --force
 
       # ── 2. Install workspace dependencies ────────────────────────────────
@@ -38,6 +40,8 @@ workflows:
       #    Use local Capacitor CLI (avoids npx downloading a different version)
       - name: Capacitor sync
         script: |
+          nvm use 22
+          node --version
           cd artifacts/qr-scanner
           pnpm exec cap sync android
 
