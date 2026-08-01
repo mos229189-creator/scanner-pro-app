@@ -66,3 +66,38 @@ id = "5D-iHZz7Qr-ggZeN4FO7p"
 uri = "file://scannerpro-release.keystore"
 type = "unspecified"
 title = "Scanner Pro — Release Keystore"
+
+[[outputs]]
+id = "eoygiel-bzv498LJ2Rb7f"
+uri = "file://attached_assets/generated_images/icon-512-new.png"
+type = "image"
+title = "App Icon 512×512"
+description = "Scanner Pro app icon — neon cyan & violet QR on dark background"
+
+[[outputs]]
+id = "8TXCGrQr9GyROMlUer3Bf"
+uri = "file://attached_assets/generated_images/feature-graphic-new.png"
+type = "image"
+title = "Feature Graphic 1024×500"
+description = "Play Store banner — dark space theme with scanner UI"
+
+[[outputs]]
+id = "olw66xOiaqErMb-24GonH"
+uri = "file://attached_assets/generated_images/screenshot-scanner-new.png"
+type = "image"
+title = "Screenshot 1 — Scanner"
+description = "Camera viewfinder with QR detection callout"
+
+[[outputs]]
+id = "HMAg7sG9zfI7VF_S-a_iG"
+uri = "file://attached_assets/generated_images/screenshot-generator-new.png"
+type = "image"
+title = "Screenshot 2 — Generator"
+description = "QR code generator with color customization"
+
+[[outputs]]
+id = "8K7WfxheeMo5j20Pg67vs"
+uri = "file://attached_assets/generated_images/screenshot-history-new.png"
+type = "image"
+title = "Screenshot 3 — History"
+description = "Scan history list with share/copy actions"
