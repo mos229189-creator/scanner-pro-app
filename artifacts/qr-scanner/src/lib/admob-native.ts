@@ -8,14 +8,14 @@
  * On Android (Capacitor)   → real AdMob SDK calls are made
  *
  * Efficiency strategy:
- *   - Interstitial & rewarded ads are PRE-LOADED right after init and
- *     re-loaded after every show, so an ad is always ready the instant
- *     it is needed (no 2–10 s load delay = far fewer lost impressions).
+ *   - The interstitial is PRE-LOADED right after init and re-loaded after
+ *     every show, so an ad is always ready the instant it is needed
+ *     (no 2–10 s load delay = far fewer lost impressions).
  *   - Each format is a serialized state machine: a single shared load
  *     promise (never two concurrent prepares) and a show-in-progress
  *     guard (never two concurrent shows against the plugin's single
  *     native ad instance).
- *   - All listeners (Dismissed, FailedToShow, Rewarded) are registered
+ *   - All listeners (Dismissed, FailedToShow) are registered
  *     up front and removed on EVERY exit path, including timeout.
  *   - Banner uses ADAPTIVE_BANNER (higher eCPM + better fill than
  *     fixed 320×50 on modern screens).
@@ -24,18 +24,12 @@
  *   App ID        : ca-app-pub-4796587410639477~1906161927  (in AndroidManifest)
  *   Banner        : ca-app-pub-4796587410639477/2365472715
  *   Interstitial  : ca-app-pub-4796587410639477/1052391042
- *   Rewarded      : ca-app-pub-4796587410639477/1052391042
- *     ⚠ NOTE: rewarded currently reuses the interstitial unit ID. Create a
- *     dedicated "Rewarded" ad unit in the AdMob console and replace
- *     AD_UNIT_REWARDED below — rewarded requests against an interstitial
- *     unit usually do not fill.
  */
 
 import { Capacitor } from "@capacitor/core";
 
 const AD_UNIT_BANNER       = "ca-app-pub-4796587410639477/2365472715";
 const AD_UNIT_INTERSTITIAL = "ca-app-pub-4796587410639477/1052391042";
-const AD_UNIT_REWARDED     = "ca-app-pub-4796587410639477/1052391042";
 
 // Max time to wait for a load or a show/dismiss cycle before giving up.
 const AD_TIMEOUT_MS = 30_000;
@@ -82,9 +76,6 @@ async function removeAll(handles: Promise<ListenerHandle>[]): Promise<void> {
 let interstitialLoad: Promise<boolean> | null = null;
 let interstitialShowing = false;
 
-let rewardedLoad: Promise<boolean> | null = null;
-let rewardedShowing = false;
-
 function preloadInterstitial(): Promise<boolean> {
   if (!isNative()) return Promise.resolve(false);
   if (!interstitialLoad) {
@@ -109,29 +100,6 @@ function preloadInterstitial(): Promise<boolean> {
   return interstitialLoad;
 }
 
-function preloadRewarded(): Promise<boolean> {
-  if (!isNative()) return Promise.resolve(false);
-  if (!rewardedLoad) {
-    rewardedLoad = (async () => {
-      try {
-        const AdMob = await getAdMob();
-        await AdMob.prepareRewardVideoAd({
-          adId: AD_UNIT_REWARDED,
-          isTesting: false,
-        });
-        return true;
-      } catch (err) {
-        console.warn("[AdMob] rewarded preload failed:", err);
-        return false;
-      }
-    })();
-    rewardedLoad.then((ok) => {
-      if (!ok) rewardedLoad = null;
-    });
-  }
-  return rewardedLoad;
-}
-
 // ─── Initialise ──────────────────────────────────────────────────────────────
 
 let _initialised = false;
@@ -143,9 +111,8 @@ export async function initAdMob(): Promise<void> {
     await AdMob.initialize({ testingDevices: [], initializeForTesting: false });
     _initialised = true;
     console.log("[AdMob] initialized");
-    // Warm the caches — don't await; let them load in the background.
+    // Warm the cache — don't await; let it load in the background.
     preloadInterstitial();
-    preloadRewarded();
   } catch (err) {
     console.warn("[AdMob] initialization failed:", err);
   }
@@ -220,55 +187,5 @@ export async function showNativeInterstitial(): Promise<void> {
     await removeAll(handles); // cleanup on every exit path, incl. timeout
     interstitialShowing = false;
     preloadInterstitial(); // warm the next one in the background
-  }
-}
-
-// ─── Rewarded ─────────────────────────────────────────────────────────────────
-
-/**
- * @returns true if the user earned the reward, false if skipped / ad failed.
- */
-export async function showNativeRewarded(): Promise<boolean> {
-  if (!isNative() || rewardedShowing) return false;
-  rewardedShowing = true;
-
-  const handles: Promise<ListenerHandle>[] = [];
-  try {
-    const ready = await withTimeout(preloadRewarded(), AD_TIMEOUT_MS, false);
-    if (!ready) return false;
-
-    rewardedLoad = null; // atomically consume
-
-    const AdMob = await getAdMob();
-    const { RewardAdPluginEvents } = await import("@capacitor-community/admob");
-
-    let rewarded = false;
-    const core = new Promise<boolean>((resolve) => {
-      handles.push(
-        AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
-          rewarded = true;
-        }),
-        AdMob.addListener(RewardAdPluginEvents.Dismissed, () =>
-          resolve(rewarded)
-        ),
-        AdMob.addListener(RewardAdPluginEvents.FailedToShow, (err) => {
-          console.warn("[AdMob] rewarded failed to show:", err);
-          resolve(false);
-        })
-      );
-      AdMob.showRewardVideoAd().catch((err: unknown) => {
-        console.warn("[AdMob] rewarded show failed:", err);
-        resolve(false);
-      });
-    });
-
-    return await withTimeout(core, AD_TIMEOUT_MS, false);
-  } catch (err) {
-    console.warn("[AdMob] rewarded error:", err);
-    return false;
-  } finally {
-    await removeAll(handles);
-    rewardedShowing = false;
-    preloadRewarded();
   }
 }

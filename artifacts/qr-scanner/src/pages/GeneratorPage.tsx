@@ -44,7 +44,7 @@ const PRESETS = [
 ];
 
 export default function GeneratorPage() {
-  const { incrementGenerate, requestRewardedAd } = useAdMob();
+  const { incrementGenerate } = useAdMob();
   const { saveQR } = useFavorites();
   
   const [activeType, setActiveType] = useState<QRType>("url");
@@ -148,15 +148,13 @@ export default function GeneratorPage() {
     toast({ title: "Downloaded as PNG" });
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     if (!qrRef.current || !isValid) return;
-    
-    // PDF download requires watching a rewarded ad
-    requestRewardedAd(async () => {
-      const canvas = qrRef.current?.querySelector("canvas");
-      if (!canvas) return;
-      
-      try {
+
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+
+    try {
         const tempCanvas = await html2canvas(qrRef.current as HTMLElement, {
           backgroundColor: bgColor,
           scale: 2
@@ -185,10 +183,9 @@ export default function GeneratorPage() {
         pdf.save(`QR_${getQRTitle().replace(/[^a-z0-9]/gi, '_')}.pdf`);
         incrementGenerate();
         toast({ title: "Downloaded as High-Quality PDF" });
-      } catch (err) {
-        toast({ title: "Failed to generate PDF", variant: "destructive" });
-      }
-    });
+    } catch (err) {
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    }
   };
 
   const handleSaveToFavorites = () => {

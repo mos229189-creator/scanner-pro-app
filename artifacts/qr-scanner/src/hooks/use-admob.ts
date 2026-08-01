@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
-import { showNativeInterstitial, showNativeRewarded } from "../lib/admob-native";
+import { showNativeInterstitial } from "../lib/admob-native";
 
 const INTERSTITIAL_THRESHOLD = 5;
 const isNative = () => Capacitor.isNativePlatform();
@@ -11,8 +11,6 @@ export function useAdMob() {
 
   // Web-mock overlay state (only shown on browser preview)
   const [showInterstitial, setShowInterstitial] = useState(false);
-  const [showRewarded, setShowRewarded] = useState(false);
-  const [rewardCallback, setRewardCallback] = useState<(() => void) | null>(null);
 
   // Restore persisted counts so the threshold carries across sessions
   useEffect(() => {
@@ -59,47 +57,16 @@ export function useAdMob() {
     });
   }, [triggerInterstitial]);
 
-  /**
-   * Show a rewarded ad then call onRewarded() if the user earned the reward.
-   *
-   * Native  → real AdMob rewarded video
-   * Web     → in-app 5-second mock overlay
-   */
-  const requestRewardedAd = useCallback((onRewarded: () => void) => {
-    if (isNative()) {
-      showNativeRewarded()
-        .then((earned) => { if (earned) onRewarded(); })
-        .catch((err) => console.warn("[AdMob] rewarded error:", err));
-    } else {
-      setRewardCallback(() => onRewarded);
-      setShowRewarded(true);
-    }
-  }, []);
-
   const handleInterstitialClose = useCallback(() => {
     setShowInterstitial(false);
   }, []);
-
-  const handleRewardedClose = useCallback(
-    (completed: boolean) => {
-      setShowRewarded(false);
-      if (completed && rewardCallback) {
-        rewardCallback();
-        setRewardCallback(null);
-      }
-    },
-    [rewardCallback]
-  );
 
   return {
     scanCount,
     generateCount,
     incrementScan,
     incrementGenerate,
-    requestRewardedAd,
     showInterstitial,
-    showRewarded,
     handleInterstitialClose,
-    handleRewardedClose,
   };
 }

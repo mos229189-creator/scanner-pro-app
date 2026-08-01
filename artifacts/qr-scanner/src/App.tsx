@@ -26,12 +26,7 @@ function MainLayout() {
     initAdMob().catch(console.warn);
   }, []);
   
-  const { 
-    showInterstitial, 
-    showRewarded, 
-    handleInterstitialClose, 
-    handleRewardedClose 
-  } = useAdMob();
+  const { showInterstitial, handleInterstitialClose } = useAdMob();
 
   const getActiveTab = () => {
     if (location === '/generator') return 'generator';
@@ -140,10 +135,7 @@ function MainLayout() {
       {/* Interstitials */}
       <AnimatePresence>
         {showInterstitial && (
-          <AdInterstitial type="interstitial" onClose={handleInterstitialClose} />
-        )}
-        {showRewarded && (
-          <AdInterstitial type="rewarded" onClose={handleRewardedClose} />
+          <AdInterstitial onClose={handleInterstitialClose} />
         )}
       </AnimatePresence>
     </div>
