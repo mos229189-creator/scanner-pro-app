@@ -57,12 +57,12 @@ workflows:
         script: |
           echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
 
-      # ── 6. Build signed release APK + AAB ────────────────────────────────
-      #    store.type=PKCS12 is required because the keystore was generated
-      #    with OpenSSL (PKCS12 format), not the Java keytool JKS format
-      #    JAVA_HOME is set explicitly because java:21 in environment doesn't
-      #    always propagate into the Gradle daemon — we find the JDK 21 path
-      #    directly so Gradle uses the correct JDK regardless of system default.
+      # ── 6. Build signed AAB (Play Store only) ────────────────────────────
+      #    Only bundleRelease is needed — assembleRelease (APK) was removed
+      #    because it doubled build time and Play Store only accepts AABs.
+      #    store.type=PKCS12 is required (keystore generated with OpenSSL).
+      #    JAVA_HOME is set explicitly; java:21 env doesn't always propagate
+      #    into the Gradle daemon on Codemagic machines.
       - name: Build Android release
         script: |
           # Resolve Java 21 home — try common Codemagic/Ubuntu JDK paths
@@ -75,7 +75,7 @@ workflows:
 
           cd artifacts/qr-scanner/android
           chmod +x gradlew
-          ./gradlew bundleRelease assembleRelease --no-daemon \
+          ./gradlew bundleRelease --no-daemon \
             -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
             -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
@@ -83,9 +83,7 @@ workflows:
             -Pandroid.injected.signing.store.type=PKCS12
 
     artifacts:
-      # APK — direct install / sideload
-      - artifacts/qr-scanner/android/app/build/outputs/apk/release/*.apk
-      # AAB — required for Play Store upload
+      # AAB — required for Play Store upload (only output; APK removed to halve build time)
       - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
 
     publishing:
