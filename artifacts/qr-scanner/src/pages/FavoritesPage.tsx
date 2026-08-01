@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { 
   Star, 
@@ -22,12 +21,12 @@ export default function FavoritesPage() {
   const hasFavorites = favoriteScans.length > 0 || savedQRs.length > 0;
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => {});
     toast({ title: "Copied to clipboard!" });
   };
 
   const handleOpenUrl = (url: string) => {
-    window.open(url, "_blank");
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (!hasFavorites) {

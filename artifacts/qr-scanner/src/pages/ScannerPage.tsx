@@ -44,8 +44,11 @@ export default function ScannerPage() {
             const formatName =
               decodedResult.result.format?.formatName ?? "QR_CODE";
             if (navigator.vibrate) navigator.vibrate(50);
-            addScan(decodedText, formatName);
-            incrementScan();
+            // addScan returns true only when a genuinely new entry was stored.
+            // Only increment the ad counter on real new scans — not every decode
+            // frame (which fires at 15 fps while the code stays in view).
+            const isNew = addScan(decodedText, formatName);
+            if (isNew) incrementScan();
           },
           () => { /* per-frame decode errors are noise — ignore */ }
         )
@@ -238,29 +241,19 @@ export default function ScannerPage() {
   // ─── Open device app-settings (best-effort) ───────────────────────────────
 
   const openSettings = () => {
+    // Opening app-settings requires a native plugin not bundled here.
+    // Show a clear instructional toast for both platforms.
     if (isNative) {
-      // On Capacitor Android the "_system" target opens the URL in the OS handler.
-      // "app-settings:" works on iOS; on Android we use the package deep-link.
-      try {
-        // Android: open this app's Settings page via intent URI
-        window.open(
-          `android.settings.APPLICATION_DETAILS_SETTINGS`,
-          "_system"
-        );
-      } catch {
-        // Fallback: can't open settings without a native plugin, show toast
-        toast({
-          title: "Open Settings manually",
-          description:
-            "Settings › Apps › Scanner Pro › Permissions › Camera",
-        });
-      }
+      toast({
+        title: "Enable camera access",
+        description:
+          "Go to Settings → Apps → Scanner Pro → Permissions → Camera, then return to the app.",
+      });
     } else {
-      // Browser: can't navigate to settings, just advise the user
       toast({
         title: "Enable camera in your browser",
         description:
-          "Click the camera/lock icon in the address bar and allow camera access, then refresh.",
+          "Tap the lock/camera icon in the address bar, allow Camera, then refresh.",
       });
     }
   };
@@ -269,13 +262,13 @@ export default function ScannerPage() {
 
   const handleCopy = () => {
     if (lastScan) {
-      navigator.clipboard.writeText(lastScan.text);
+      navigator.clipboard?.writeText(lastScan.text).catch(() => {});
       toast({ title: "Copied to clipboard!" });
     }
   };
 
   const handleOpenUrl = () => {
-    if (lastScan?.isURL) window.open(lastScan.text, "_blank");
+    if (lastScan?.isURL) window.open(lastScan.text, "_blank", "noopener,noreferrer");
   };
 
   const handleShare = async () => {

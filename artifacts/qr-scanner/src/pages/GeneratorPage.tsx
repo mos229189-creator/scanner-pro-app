@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -15,7 +15,6 @@ import {
   Share2,
   ChevronDown,
   Palette,
-  Settings2,
   Star,
   FileText
 } from "lucide-react";

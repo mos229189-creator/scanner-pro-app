@@ -2,11 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import { showNativeInterstitial, showNativeRewarded } from "../lib/admob-native";
 
-// Ad Unit IDs
-// App ID:               ca-app-pub-4796587410639477~1906161927
-// Interstitial Ad Unit: ca-app-pub-4796587410639477/1052391042
-// Rewarded Ad Unit:     ca-app-pub-4796587410639477/1052391042
-
 const INTERSTITIAL_THRESHOLD = 5;
 const isNative = () => Capacitor.isNativePlatform();
 
@@ -14,32 +9,38 @@ export function useAdMob() {
   const [scanCount, setScanCount] = useState(0);
   const [generateCount, setGenerateCount] = useState(0);
 
-  // Web-mock state (only shown on browser/web preview)
+  // Web-mock overlay state (only shown on browser preview)
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [showRewarded, setShowRewarded] = useState(false);
   const [rewardCallback, setRewardCallback] = useState<(() => void) | null>(null);
 
+  // Restore persisted counts so the threshold carries across sessions
   useEffect(() => {
-    const sCount = parseInt(localStorage.getItem("ad_scan_count") || "0");
-    const gCount = parseInt(localStorage.getItem("ad_generate_count") || "0");
-    setScanCount(sCount);
-    setGenerateCount(gCount);
+    const s = parseInt(localStorage.getItem("ad_scan_count") ?? "0", 10);
+    const g = parseInt(localStorage.getItem("ad_generate_count") ?? "0", 10);
+    setScanCount(isNaN(s) ? 0 : s);
+    setGenerateCount(isNaN(g) ? 0 : g);
   }, []);
 
   const triggerInterstitial = useCallback(async () => {
     if (isNative()) {
-      // Native: show real AdMob interstitial; don't show web mock
-      await showNativeInterstitial();
+      // Native: fire real interstitial; catch so unhandled rejection never crashes the app
+      showNativeInterstitial().catch((err) =>
+        console.warn("[AdMob] interstitial error:", err)
+      );
     } else {
-      // Web preview: show the in-app mock overlay
       setShowInterstitial(true);
     }
   }, []);
 
+  /**
+   * Call after a confirmed new scan (not a deduplicated one).
+   * ScannerPage is responsible for only calling this when a scan was actually added.
+   */
   const incrementScan = useCallback(() => {
-    setScanCount(prev => {
+    setScanCount((prev) => {
       const next = prev + 1;
-      localStorage.setItem("ad_scan_count", next.toString());
+      localStorage.setItem("ad_scan_count", String(next));
       if (next % INTERSTITIAL_THRESHOLD === 0) {
         triggerInterstitial();
       }
@@ -48,9 +49,9 @@ export function useAdMob() {
   }, [triggerInterstitial]);
 
   const incrementGenerate = useCallback(() => {
-    setGenerateCount(prev => {
+    setGenerateCount((prev) => {
       const next = prev + 1;
-      localStorage.setItem("ad_generate_count", next.toString());
+      localStorage.setItem("ad_generate_count", String(next));
       if (next % INTERSTITIAL_THRESHOLD === 0) {
         triggerInterstitial();
       }
@@ -59,41 +60,36 @@ export function useAdMob() {
   }, [triggerInterstitial]);
 
   /**
-   * Request a rewarded ad before executing onRewarded.
+   * Show a rewarded ad then call onRewarded() if the user earned the reward.
    *
-   * Native (Android):
-   *   → prepareRewardVideoAd → showRewardVideoAd
-   *   → onRewarded() fires only if the user earned the reward
-   *
-   * Web preview:
-   *   → Shows the in-app 5-second mock overlay
-   *   → onRewarded() fires when the user clicks "Continue"
+   * Native  → real AdMob rewarded video
+   * Web     → in-app 5-second mock overlay
    */
   const requestRewardedAd = useCallback((onRewarded: () => void) => {
     if (isNative()) {
-      // Native path: bypass web mock entirely
-      showNativeRewarded().then((earned) => {
-        if (earned) onRewarded();
-      });
+      showNativeRewarded()
+        .then((earned) => { if (earned) onRewarded(); })
+        .catch((err) => console.warn("[AdMob] rewarded error:", err));
     } else {
-      // Web mock path
       setRewardCallback(() => onRewarded);
       setShowRewarded(true);
     }
   }, []);
 
-  // Web mock close handlers (no-ops on native)
   const handleInterstitialClose = useCallback(() => {
     setShowInterstitial(false);
   }, []);
 
-  const handleRewardedClose = useCallback((completed: boolean) => {
-    setShowRewarded(false);
-    if (completed && rewardCallback) {
-      rewardCallback();
-      setRewardCallback(null);
-    }
-  }, [rewardCallback]);
+  const handleRewardedClose = useCallback(
+    (completed: boolean) => {
+      setShowRewarded(false);
+      if (completed && rewardCallback) {
+        rewardCallback();
+        setRewardCallback(null);
+      }
+    },
+    [rewardCallback]
+  );
 
   return {
     scanCount,
