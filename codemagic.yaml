@@ -1,7 +1,7 @@
 workflows:
   android-release:
     name: Scanner Pro — Android Release
-    max_build_duration: 60
+    max_build_duration: 120
     environment:
       node: 22.13.1
       java: 21
@@ -75,7 +75,7 @@ workflows:
 
           cd artifacts/qr-scanner/android
           chmod +x gradlew
-          ./gradlew bundleRelease assembleRelease \
+          ./gradlew bundleRelease assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
             -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
