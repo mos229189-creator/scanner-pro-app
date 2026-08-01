@@ -16,26 +16,35 @@ workflows:
         #   CM_KEY_PASSWORD
         - keystore_credentials
 
-    # Cache Gradle + pnpm downloads between builds — cuts build time dramatically
+    # Cache everything that can be reused across builds:
+    #   ~/.gradle/caches      — downloaded Android/Capacitor/AdMob libraries
+    #   ~/.gradle/wrapper     — Gradle distribution itself
+    #   ~/.local/share/pnpm/store — pnpm package store (avoids re-downloading npm packages)
+    #   android/app/build     — compiled Java/Kotlin classes & resources (makes Gradle incremental)
     cache:
       cache_paths:
         - ~/.gradle/caches
         - ~/.gradle/wrapper
-        - $CM_BUILD_DIR/node_modules
+        - ~/.local/share/pnpm/store
+        - $CM_BUILD_DIR/artifacts/qr-scanner/android/app/build
 
     scripts:
       # ── 1. Install pnpm ───────────────────────────────────────────────────
+      #    environment: node: 22.13.1 already sets up Node 22 on the machine,
+      #    so we only need `nvm use` (not `nvm install`) — saves ~30s per build.
+      #    Skip reinstalling pnpm if the right version is already present.
       - name: Install pnpm
         script: |
-          nvm install 22 && nvm use 22
+          nvm use 22
           node --version
-          npm install -g pnpm@9 --force
+          pnpm --version 2>/dev/null | grep -q "^9\." || npm install -g pnpm@9
 
       # ── 2. Install workspace dependencies ────────────────────────────────
-      #    Use --no-frozen-lockfile so pnpm@9 doesn't reject the v10 lockfile
+      #    --no-frozen-lockfile: pnpm@9 would reject the v10 lockfile format.
+      #    --prefer-offline: use cached store packages without hitting the network.
       - name: Install dependencies
         script: |
-          pnpm install --no-frozen-lockfile
+          pnpm install --no-frozen-lockfile --prefer-offline
 
       # ── 3. Build the web app (Vite) ───────────────────────────────────────
       - name: Build web assets
@@ -47,8 +56,6 @@ workflows:
       #    Use local Capacitor CLI (avoids npx downloading a different version)
       - name: Capacitor sync
         script: |
-          nvm use 22
-          node --version
           cd artifacts/qr-scanner
           pnpm exec cap sync android
 
