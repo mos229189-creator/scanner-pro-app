@@ -2,23 +2,25 @@ workflows:
   android-release:
     name: Scanner Pro — Android Release
     max_build_duration: 120
+
     environment:
+      # Codemagic pre-installs Node 22 and sets PATH automatically.
+      # java: 21 sets JAVA_HOME to the JDK 21 path on the build machine.
       node: 22.13.1
       java: 21
       vars:
         PACKAGE_NAME: "com.scanpro.app"
       groups:
-        # Create this group in Codemagic → Teams → Global variables & secrets
-        # Add these four variables to it (see CLOUD_BUILD_SETUP.md for values):
-        #   CM_KEYSTORE         — base64-encoded .keystore (PKCS12) file
-        #   CM_KEYSTORE_PASSWORD
-        #   CM_KEY_ALIAS
-        #   CM_KEY_PASSWORD
+        # Team → Global variables & secrets → Group name: keystore_credentials
+        # Variables inside the group:
+        #   CM_KEYSTORE          — base64-encoded PKCS12 keystore file
+        #   CM_KEYSTORE_PASSWORD — store password (ScanPro2024)
+        #   CM_KEY_ALIAS         — key alias (scannerpro)
+        #   CM_KEY_PASSWORD      — key password (ScanPro2024)
         - keystore_credentials
 
-    # Safe caches — only downloaded artifacts, never compiled outputs.
-    # DO NOT cache android/app/build: stale incremental state across machines
-    # causes Gradle to hang for hours re-validating broken cached outputs.
+    # Only cache safe, portable artifacts (downloaded JARs + pnpm packages).
+    # NEVER cache android/app/build — stale incremental state causes 2-hour hangs.
     cache:
       cache_paths:
         - ~/.gradle/caches
@@ -26,71 +28,80 @@ workflows:
         - ~/.local/share/pnpm/store
 
     scripts:
-      # ── 1. Install pnpm ───────────────────────────────────────────────────
-      #    Node 22 is already available via `environment: node: 22.13.1` —
-      #    no nvm call needed. pnpm may also be pre-installed on the machine;
-      #    only install (with --force to overwrite) if it's missing or wrong version.
+      # ── 1. Ensure pnpm 9 is available ────────────────────────────────────
       - name: Install pnpm
         script: |
+          set -euo pipefail
           node --version
-          pnpm --version 2>/dev/null | grep -q "^9\." \
-            && echo "pnpm 9 already present, skipping install" \
-            || npm install -g pnpm@9 --force
+          # Use if/else — more robust than && || chains under set -e
+          if pnpm --version 2>/dev/null | grep -q "^9\."; then
+            echo "pnpm $(pnpm --version) already installed — skipping"
+          else
+            npm install -g pnpm@9 --force
+            echo "Installed pnpm $(pnpm --version)"
+          fi
 
       # ── 2. Install workspace dependencies ────────────────────────────────
-      #    --no-frozen-lockfile: pnpm@9 would reject the v10 lockfile format.
-      #    Do NOT use --prefer-offline: if pnpm store cache is cold it hangs.
       - name: Install dependencies
         script: |
+          set -euo pipefail
+          # --no-frozen-lockfile: pnpm 9 rejects a lockfile written by pnpm 10
           pnpm install --no-frozen-lockfile
 
-      # ── 3. Build the web app (Vite) ───────────────────────────────────────
+      # ── 3. Build the Vite web app ─────────────────────────────────────────
       - name: Build web assets
         script: |
+          set -euo pipefail
           cd artifacts/qr-scanner
           PORT=3000 BASE_PATH=./ pnpm run build
 
-      # ── 4. Sync web assets into Android project ───────────────────────────
-      #    Use local Capacitor CLI (avoids npx downloading a different version)
+      # ── 4. Copy web assets into the Android project ───────────────────────
       - name: Capacitor sync
         script: |
+          set -euo pipefail
           cd artifacts/qr-scanner
           pnpm exec cap sync android
 
-      # ── 5. Decode & write the keystore file ───────────────────────────────
+      # ── 5. Write keystore to disk ─────────────────────────────────────────
       - name: Set up keystore
         script: |
-          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
+          set -euo pipefail
+          echo "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/release.keystore"
+          echo "Keystore written: $(wc -c < "$CM_BUILD_DIR/release.keystore") bytes"
 
-      # ── 6. Build signed AAB (Play Store only) ────────────────────────────
-      #    Only bundleRelease — Play Store only accepts AABs; APK removed to
-      #    halve build time. store.type=PKCS12 required (OpenSSL keystore).
-      #    JAVA_HOME set explicitly; java:21 env doesn't always reach Gradle.
-      #    SDK licenses accepted non-interactively to prevent silent hangs.
+      # ── 6. Build the signed AAB ───────────────────────────────────────────
+      # Play Store requires AAB; APK build was removed to halve compile time.
+      # PKCS12 flag required — keystore was generated with OpenSSL, not keytool.
+      # JAVA_HOME: Codemagic sets it via `java: 21`, but we verify/override to
+      # make sure the Gradle daemon uses JDK 21 and not the system default.
       - name: Build Android release
         script: |
-          # Accept all Android SDK licenses non-interactively (prevents hangs)
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          set -euo pipefail
 
-          # Resolve Java 21 home — try common Codemagic/Ubuntu JDK paths
-          JAVA21=$(find /usr/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
-          [ -z "$JAVA21" ] && JAVA21=$(find /usr/local/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
-          [ -z "$JAVA21" ] && JAVA21=$(dirname $(dirname $(readlink -f $(which java))))
-          export JAVA_HOME="$JAVA21"
-          echo "Using JAVA_HOME: $JAVA_HOME"
-          java -version
+          # Accept all SDK licenses non-interactively (prevents silent hangs)
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses \
+            >/dev/null 2>&1 || true
+
+          # Verify / fix JAVA_HOME — prefer Codemagic's $JAVA_HOME, fall back to find
+          if [ -z "${JAVA_HOME:-}" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q "21"; then
+            JAVA_HOME=$(find /usr/lib/jvm /usr/local/lib/jvm -maxdepth 1 \
+              -type d -name "*21*" 2>/dev/null | head -1)
+          fi
+          export JAVA_HOME
+          echo "JAVA_HOME: $JAVA_HOME"
+          "$JAVA_HOME/bin/java" -version
 
           cd artifacts/qr-scanner/android
           chmod +x gradlew
+
           ./gradlew bundleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD \
+            -Pandroid.injected.signing.store.file="$CM_BUILD_DIR/release.keystore" \
+            -Pandroid.injected.signing.store.password="$CM_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$CM_KEY_PASSWORD" \
             -Pandroid.injected.signing.store.type=PKCS12
 
     artifacts:
-      # AAB — required for Play Store upload (only output; APK removed to halve build time)
       - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
 
     publishing:
