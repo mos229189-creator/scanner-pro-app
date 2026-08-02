@@ -27,13 +27,15 @@ workflows:
 
     scripts:
       # ── 1. Install pnpm ───────────────────────────────────────────────────
-      #    Use nvm install as fallback in case node 22 isn't pre-loaded yet.
-      #    Skip reinstalling pnpm if v9 is already present.
+      #    Node 22 is already available via `environment: node: 22.13.1` —
+      #    no nvm call needed. pnpm may also be pre-installed on the machine;
+      #    only install (with --force to overwrite) if it's missing or wrong version.
       - name: Install pnpm
         script: |
-          nvm use 22 2>/dev/null || (nvm install 22 && nvm use 22)
           node --version
-          pnpm --version 2>/dev/null | grep -q "^9\." || npm install -g pnpm@9
+          pnpm --version 2>/dev/null | grep -q "^9\." \
+            && echo "pnpm 9 already present, skipping install" \
+            || npm install -g pnpm@9 --force
 
       # ── 2. Install workspace dependencies ────────────────────────────────
       #    --no-frozen-lockfile: pnpm@9 would reject the v10 lockfile format.
