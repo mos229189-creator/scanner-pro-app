@@ -16,35 +16,31 @@ workflows:
         #   CM_KEY_PASSWORD
         - keystore_credentials
 
-    # Cache everything that can be reused across builds:
-    #   ~/.gradle/caches      — downloaded Android/Capacitor/AdMob libraries
-    #   ~/.gradle/wrapper     — Gradle distribution itself
-    #   ~/.local/share/pnpm/store — pnpm package store (avoids re-downloading npm packages)
-    #   android/app/build     — compiled Java/Kotlin classes & resources (makes Gradle incremental)
+    # Safe caches — only downloaded artifacts, never compiled outputs.
+    # DO NOT cache android/app/build: stale incremental state across machines
+    # causes Gradle to hang for hours re-validating broken cached outputs.
     cache:
       cache_paths:
         - ~/.gradle/caches
         - ~/.gradle/wrapper
         - ~/.local/share/pnpm/store
-        - $CM_BUILD_DIR/artifacts/qr-scanner/android/app/build
 
     scripts:
       # ── 1. Install pnpm ───────────────────────────────────────────────────
-      #    environment: node: 22.13.1 already sets up Node 22 on the machine,
-      #    so we only need `nvm use` (not `nvm install`) — saves ~30s per build.
-      #    Skip reinstalling pnpm if the right version is already present.
+      #    Use nvm install as fallback in case node 22 isn't pre-loaded yet.
+      #    Skip reinstalling pnpm if v9 is already present.
       - name: Install pnpm
         script: |
-          nvm use 22
+          nvm use 22 2>/dev/null || (nvm install 22 && nvm use 22)
           node --version
           pnpm --version 2>/dev/null | grep -q "^9\." || npm install -g pnpm@9
 
       # ── 2. Install workspace dependencies ────────────────────────────────
       #    --no-frozen-lockfile: pnpm@9 would reject the v10 lockfile format.
-      #    --prefer-offline: use cached store packages without hitting the network.
+      #    Do NOT use --prefer-offline: if pnpm store cache is cold it hangs.
       - name: Install dependencies
         script: |
-          pnpm install --no-frozen-lockfile --prefer-offline
+          pnpm install --no-frozen-lockfile
 
       # ── 3. Build the web app (Vite) ───────────────────────────────────────
       - name: Build web assets
@@ -65,13 +61,15 @@ workflows:
           echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
 
       # ── 6. Build signed AAB (Play Store only) ────────────────────────────
-      #    Only bundleRelease is needed — assembleRelease (APK) was removed
-      #    because it doubled build time and Play Store only accepts AABs.
-      #    store.type=PKCS12 is required (keystore generated with OpenSSL).
-      #    JAVA_HOME is set explicitly; java:21 env doesn't always propagate
-      #    into the Gradle daemon on Codemagic machines.
+      #    Only bundleRelease — Play Store only accepts AABs; APK removed to
+      #    halve build time. store.type=PKCS12 required (OpenSSL keystore).
+      #    JAVA_HOME set explicitly; java:21 env doesn't always reach Gradle.
+      #    SDK licenses accepted non-interactively to prevent silent hangs.
       - name: Build Android release
         script: |
+          # Accept all Android SDK licenses non-interactively (prevents hangs)
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
           # Resolve Java 21 home — try common Codemagic/Ubuntu JDK paths
           JAVA21=$(find /usr/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
           [ -z "$JAVA21" ] && JAVA21=$(find /usr/local/lib/jvm -maxdepth 1 -type d -name "*21*" 2>/dev/null | head -1)
