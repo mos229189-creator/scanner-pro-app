@@ -238,19 +238,9 @@ export default function ScannerPage() {
     startScanner(cameras[next].id);
   };
 
-  // ─── Open device app-settings ────────────────────────────────────────────
-  // On Android: uses the AndroidBridge JavascriptInterface registered in
-  // MainActivity.java which fires ACTION_APPLICATION_DETAILS_SETTINGS intent.
-  // On web/iOS: falls back to an instructional toast.
-
+  // ─── Open device app-settings (instructional) ───────────────────────────
   const openSettings = () => {
     if (isNative) {
-      const bridge = (window as any).AndroidBridge;
-      if (bridge?.openSettings) {
-        bridge.openSettings();
-        return;
-      }
-      // Fallback if bridge not available (e.g., iOS)
       toast({
         title: "Enable camera access",
         description:
