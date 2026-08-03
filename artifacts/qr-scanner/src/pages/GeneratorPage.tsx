@@ -87,6 +87,75 @@ export default function GeneratorPage() {
   const [socialPlat, setSocialPlat] = useState("https://twitter.com/");
   const [socialUser, setSocialUser] = useState("");
 
+  // ── Restore state when arriving from Favorites "Edit" ──────────────────────
+  // FavoritesPage writes the saved item to localStorage before navigating here.
+  // We read + clear it on mount so navigation always starts fresh otherwise.
+  useEffect(() => {
+    const raw = localStorage.getItem("qr_edit_draft");
+    if (!raw) return;
+    localStorage.removeItem("qr_edit_draft");
+    try {
+      const item = JSON.parse(raw) as { type: string; text: string; fgColor: string; bgColor: string };
+      const type = item.type as QRType;
+      const t = item.text ?? "";
+      setActiveType(type);
+      setFgColor(item.fgColor || "#000000");
+      setBgColor(item.bgColor || "#ffffff");
+      setShowCustomization(true); // open customization panel so colors are visible
+
+      switch (type) {
+        case "url":    setUrl(t); break;
+        case "text":   setText(t); break;
+        case "phone":  setPhone(t.replace(/^tel:/, "")); break;
+        case "wifi": {
+          setWifiSsid(t.match(/S:([^;]*)/)?.[1] ?? "");
+          setWifiPass(t.match(/P:([^;]*)/)?.[1] ?? "");
+          setWifiSec(t.match(/T:([^;]*)/)?.[1] ?? "WPA");
+          setWifiHidden(t.includes("H:true"));
+          break;
+        }
+        case "email": {
+          const [addr, qs] = t.replace(/^mailto:/, "").split("?");
+          const params = new URLSearchParams(qs ?? "");
+          setEmailTo(decodeURIComponent(addr ?? ""));
+          setEmailSubj(params.get("subject") ?? "");
+          setEmailBody(params.get("body") ?? "");
+          break;
+        }
+        case "sms": {
+          const [ph, qs] = t.replace(/^sms:/, "").split("?");
+          setSmsPhone(ph ?? "");
+          setSmsMsg(new URLSearchParams(qs ?? "").get("body") ?? "");
+          break;
+        }
+        case "location": {
+          const [lat, lng] = t.replace(/^geo:/, "").split(",");
+          setLocLat(lat ?? ""); setLocLng(lng ?? "");
+          break;
+        }
+        case "social": {
+          const prefixes = [
+            "https://twitter.com/", "https://instagram.com/",
+            "https://linkedin.com/in/", "https://youtube.com/",
+            "https://github.com/", "https://tiktok.com/@", "https://facebook.com/",
+          ];
+          const matched = prefixes.find((p) => t.startsWith(p));
+          if (matched) { setSocialPlat(matched); setSocialUser(t.slice(matched.length)); }
+          break;
+        }
+        case "contact": {
+          setContactFirst(t.match(/FN:([^\n\r]+)/)?.[1]?.split(" ")[0] ?? "");
+          setContactLast(t.match(/N:[^;]*;([^;]*)/)?.[1] ?? "");
+          setContactPhone(t.match(/TEL[^:]*:([^\n\r]+)/)?.[1] ?? "");
+          setContactEmail(t.match(/EMAIL[^:]*:([^\n\r]+)/)?.[1] ?? "");
+          setContactCompany(t.match(/ORG:([^\n\r]+)/)?.[1] ?? "");
+          setContactWeb(t.match(/URL:([^\n\r]+)/)?.[1] ?? "");
+          break;
+        }
+      }
+    } catch {}
+  }, []);
+
   // Derived content
   const getQRContent = () => {
     switch (activeType) {
@@ -445,11 +514,10 @@ export default function GeneratorPage() {
                 <button
                   onClick={downloadPDF}
                   disabled={!isValid}
-                  className="h-14 bg-primary text-primary-foreground font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-primary/20 relative overflow-hidden"
+                  className="h-14 bg-primary text-primary-foreground font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-primary/20"
                 >
-                  <div className="absolute top-0 right-0 bg-yellow-400 text-amber-900 text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg">PRO</div>
-                  <Download className="w-5 h-5" />
-                  PDF (Ad)
+                  <FileText className="w-5 h-5" />
+                  Save PDF
                 </button>
               </div>
               

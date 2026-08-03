@@ -100,7 +100,16 @@ export default function FavoritesPage() {
                       Copy
                     </button>
                     <button 
-                      onClick={() => setLocation("/generator")} // In a real app we'd pass state to prepopulate
+                      onClick={() => {
+                        // Write edit state to localStorage so GeneratorPage can restore it on mount
+                        localStorage.setItem("qr_edit_draft", JSON.stringify({
+                          type: item.type,
+                          text: item.text,
+                          fgColor: item.fgColor,
+                          bgColor: item.bgColor,
+                        }));
+                        setLocation("/generator");
+                      }}
                       className="flex-1 py-2 bg-primary text-primary-foreground text-[10px] font-bold rounded-xl"
                     >
                       Edit
