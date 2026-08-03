@@ -97,10 +97,14 @@ workflows:
           cd artifacts/qr-scanner/android
           chmod +x gradlew
 
-          # bundleRelease  → app-release.aab  (Play Store submission)
-          # assembleRelease → app-release.apk  (direct device install / sideload)
-          # Single Gradle invocation: shared task graph, no double-compilation.
-          ./gradlew bundleRelease assembleRelease --no-daemon \
+          # bundleRelease  → app-release.aab        (Play Store submission)
+          # assembleRelease → app-release.apk        (signed release APK)
+          # assembleDebug   → app-debug.apk          (debug APK — guaranteed sideload)
+          #
+          # All three tasks share the same compilation graph (no double-compile).
+          # assembleDebug uses the auto-generated debug keystore so no extra
+          # signing flags are needed; it will always install cleanly on any device.
+          ./gradlew bundleRelease assembleRelease assembleDebug --no-daemon \
             -Pandroid.injected.signing.store.file="$CM_BUILD_DIR/release.keystore" \
             -Pandroid.injected.signing.store.password="$CM_KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
@@ -110,6 +114,7 @@ workflows:
     artifacts:
       - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
       - artifacts/qr-scanner/android/app/build/outputs/apk/release/*.apk
+      - artifacts/qr-scanner/android/app/build/outputs/apk/debug/*.apk
 
     publishing:
       email:
