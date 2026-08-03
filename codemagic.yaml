@@ -69,11 +69,14 @@ workflows:
           echo "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/release.keystore"
           echo "Keystore written: $(wc -c < "$CM_BUILD_DIR/release.keystore") bytes"
 
-      # ── 6. Build the signed AAB ───────────────────────────────────────────
-      # Play Store requires AAB; APK build was removed to halve compile time.
+      # ── 6. Build signed AAB + APK ─────────────────────────────────────────
+      # Both tasks run in a single Gradle invocation so all compilation work
+      # (compileReleaseJavaWithJavac, mergeReleaseResources, dexRelease, etc.)
+      # is shared between them.  The extra cost over AAB-only is just the final
+      # APK packaging step — typically < 30 s on Codemagic's M-series builders.
+      #
       # PKCS12 flag required — keystore was generated with OpenSSL, not keytool.
-      # JAVA_HOME: Codemagic sets it via `java: 21`, but we verify/override to
-      # make sure the Gradle daemon uses JDK 21 and not the system default.
+      # JAVA_HOME: verified/overridden to ensure the Gradle daemon uses JDK 21.
       - name: Build Android release
         script: |
           set -euo pipefail
@@ -94,7 +97,10 @@ workflows:
           cd artifacts/qr-scanner/android
           chmod +x gradlew
 
-          ./gradlew bundleRelease --no-daemon \
+          # bundleRelease  → app-release.aab  (Play Store submission)
+          # assembleRelease → app-release.apk  (direct device install / sideload)
+          # Single Gradle invocation: shared task graph, no double-compilation.
+          ./gradlew bundleRelease assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$CM_BUILD_DIR/release.keystore" \
             -Pandroid.injected.signing.store.password="$CM_KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
@@ -103,6 +109,7 @@ workflows:
 
     artifacts:
       - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
+      - artifacts/qr-scanner/android/app/build/outputs/apk/release/*.apk
 
     publishing:
       email:
