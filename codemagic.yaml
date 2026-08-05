@@ -145,8 +145,33 @@ workflows:
           done
 
           APKSIGNER="$ANDROID_SDK_ROOT/build-tools/$(ls "$ANDROID_SDK_ROOT/build-tools" | sort -V | tail -1)/apksigner"
+          AAPT="$ANDROID_SDK_ROOT/build-tools/$(ls "$ANDROID_SDK_ROOT/build-tools" | sort -V | tail -1)/aapt"
           "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK"
           "$APKSIGNER" verify --verbose --print-certs "$DEBUG_APK"
+          jarsigner -verify "$AAB" >/dev/null
+
+          # Verify the release APK was signed by the supplied release key.
+          EXPECTED_CERT=$(
+            keytool -exportcert \
+              -keystore "$CM_BUILD_DIR/release.keystore" \
+              -storetype PKCS12 \
+              -storepass "$CM_KEYSTORE_PASSWORD" \
+              -alias "$CM_KEY_ALIAS" |
+              openssl dgst -sha256 |
+              awk '{ print $NF }'
+          )
+          ACTUAL_CERT=$(
+            "$APKSIGNER" verify --print-certs "$RELEASE_APK" |
+              awk -F': ' '/certificate SHA-256 digest:/ { print $2; exit }'
+          )
+          test "$EXPECTED_CERT" = "$ACTUAL_CERT"
+
+          # Validate package identity, SDK levels, and launcher activity.
+          BADGING=$("$AAPT" dump badging "$RELEASE_APK")
+          printf '%s\n' "$BADGING" | grep -q "package: name='$PACKAGE_NAME'"
+          printf '%s\n' "$BADGING" | grep -q "sdkVersion:'24'"
+          printf '%s\n' "$BADGING" | grep -q "targetSdkVersion:'36'"
+          printf '%s\n' "$BADGING" | grep -q "launchable-activity: name='$PACKAGE_NAME.MainActivity'"
 
           # Capacitor web assets must be present inside both APKs.
           unzip -l "$RELEASE_APK" | grep -q 'assets/public/index.html'
