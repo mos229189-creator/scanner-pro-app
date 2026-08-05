@@ -1,0 +1,1 @@
+- [Android clean-build toolchain](android-clean-build-toolchain.md) — local release verification needs API 36 plus Build Tools 35; never infer device crashes without logs.
