@@ -1,6 +1,6 @@
-# [Project name]
+# Scanner Pro
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Scanner Pro is a local-first Android QR and barcode scanner and QR generator built with React, Vite, Capacitor, and AdMob.
 
 ## Run & Operate
 
@@ -30,15 +30,20 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Scan QR codes and common retail/industrial barcode formats with the device camera
+- Generate and save QR codes for URLs, text, Wi-Fi, contacts, phone, email, SMS, locations, and social profiles
+- Store scan history and favorites locally on the device
+- Build signed Android release artifacts through Codemagic
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Diagnose release failures from evidence and complete builds; do not claim physical-device behavior was verified without device logs or hardware testing.
+- After release fixes, verify that the pushed GitHub branch matches the local commit.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Android release builds require JDK 21, Android API 36, a PKCS12 keystore, and the `keystore_credentials` Codemagic group.
+- Run the scanner artifact typecheck before Vite and Gradle builds; Vite transpilation alone does not catch missing React imports.
 
 ## Pointers
 

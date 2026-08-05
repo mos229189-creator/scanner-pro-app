@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { Copy, ExternalLink, Camera, Flashlight, AlertCircle, Share2, Star, Settings, RefreshCw } from "lucide-react";
 import { useHistory } from "../hooks/use-history";
 import { useAdMob } from "../hooks/use-admob";
+import { openAppSettings } from "../lib/app-settings";
 import { toast } from "@/hooks/use-toast";
 
 // Permission state machine
@@ -32,8 +33,26 @@ export default function ScannerPage() {
   // ─── Scanner lifecycle ───────────────────────────────────────────────────
 
   const startScanner = useCallback((cameraId: string) => {
+    const reader = document.getElementById("reader");
+    if (!reader) return;
+
+    if (!scannerRef.current) {
+      scannerRef.current = new Html5Qrcode("reader", {
+        verbose: false,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.PDF_417,
+        ],
+      });
+    }
     const scanner = scannerRef.current;
-    if (!scanner) return;
 
     const doStart = () => {
       scanner
@@ -59,7 +78,10 @@ export default function ScannerPage() {
             if (caps && "torch" in caps) setHasTorch(true);
           } catch (_) {}
         })
-        .catch(console.error);
+        .catch((error) => {
+          console.error("Scanner start failed", error);
+          setPermState("denied");
+        });
     };
 
     if (scanner.isScanning) {
@@ -70,31 +92,24 @@ export default function ScannerPage() {
   }, [addScan, incrementScan]);
 
   const initScanner = useCallback((devices: { id: string; label: string }[]) => {
-    if (!scannerRef.current) {
-      scannerRef.current = new Html5Qrcode("reader", {
-        verbose: false,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.PDF_417,
-        ],
-      });
-    }
     setCameras(devices);
-    setCurrentCamera(0);
-    setPermState("granted");
     // Prefer rear camera on mobile
-    const preferBack = devices.find(d =>
+    const preferredIndex = devices.findIndex(d =>
       /back|rear|environment/i.test(d.label)
     );
-    startScanner((preferBack ?? devices[0]).id);
-  }, [startScanner]);
+    setCurrentCamera(preferredIndex >= 0 ? preferredIndex : 0);
+    // Rendering the reader happens after this state update. A separate effect
+    // starts html5-qrcode only after the element exists in the DOM.
+    setPermState("granted");
+  }, []);
+
+  useEffect(() => {
+    if (permState !== "granted" || !cameras[currentCamera]) return;
+    const frame = requestAnimationFrame(() => {
+      startScanner(cameras[currentCamera].id);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [cameras, currentCamera, permState, startScanner]);
 
   // ─── Permission request ──────────────────────────────────────────────────
 
@@ -235,17 +250,20 @@ export default function ScannerPage() {
     if (cameras.length < 2) return;
     const next = (currentCamera + 1) % cameras.length;
     setCurrentCamera(next);
-    startScanner(cameras[next].id);
   };
 
   // ─── Open device app-settings (instructional) ───────────────────────────
-  const openSettings = () => {
+  const openSettings = async () => {
     if (isNative) {
-      toast({
-        title: "Enable camera access",
-        description:
-          "Go to Settings → Apps → Scanner Pro → Permissions → Camera, then return to the app.",
-      });
+      try {
+        await openAppSettings();
+      } catch {
+        toast({
+          title: "Enable camera access",
+          description:
+            "Go to Settings → Apps → Scanner Pro → Permissions → Camera, then return to the app.",
+        });
+      }
     } else {
       toast({
         title: "Enable camera in your browser",

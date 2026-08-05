@@ -16,6 +16,10 @@ import { initAdMob } from "./lib/admob-native";
 import { AnimatePresence, motion } from "framer-motion";
 
 const queryClient = new QueryClient();
+const routerBase =
+  import.meta.env.BASE_URL === "./"
+    ? ""
+    : import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function MainLayout() {
   const [location, setLocation] = useLocation();
@@ -146,7 +150,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <WouterRouter base={routerBase}>
           <div className="min-h-[100dvh] bg-black/90 flex justify-center items-center font-sans">
             <MainLayout />
           </div>

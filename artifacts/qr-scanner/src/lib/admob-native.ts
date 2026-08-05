@@ -27,9 +27,16 @@
  */
 
 import { Capacitor } from "@capacitor/core";
+import { isDebugBuild } from "./app-settings";
 
-const AD_UNIT_BANNER       = "ca-app-pub-4796587410639477/2365472715";
-const AD_UNIT_INTERSTITIAL = "ca-app-pub-4796587410639477/1052391042";
+const PRODUCTION_ADS = {
+  banner: "ca-app-pub-4796587410639477/2365472715",
+  interstitial: "ca-app-pub-4796587410639477/1052391042",
+};
+const TEST_ADS = {
+  banner: "ca-app-pub-3940256099942544/6300978111",
+  interstitial: "ca-app-pub-3940256099942544/1033173712",
+};
 
 // Max time to wait for a load or a show/dismiss cycle before giving up.
 const AD_TIMEOUT_MS = 30_000;
@@ -75,6 +82,14 @@ async function removeAll(handles: Promise<ListenerHandle>[]): Promise<void> {
 
 let interstitialLoad: Promise<boolean> | null = null;
 let interstitialShowing = false;
+let debugBuildPromise: Promise<boolean> | null = null;
+
+function getDebugBuild(): Promise<boolean> {
+  if (!debugBuildPromise) {
+    debugBuildPromise = isDebugBuild().catch(() => true);
+  }
+  return debugBuildPromise;
+}
 
 function preloadInterstitial(): Promise<boolean> {
   if (!isNative()) return Promise.resolve(false);
@@ -82,9 +97,10 @@ function preloadInterstitial(): Promise<boolean> {
     interstitialLoad = (async () => {
       try {
         const AdMob = await getAdMob();
+        const debug = await getDebugBuild();
         await AdMob.prepareInterstitial({
-          adId: AD_UNIT_INTERSTITIAL,
-          isTesting: false,
+          adId: debug ? TEST_ADS.interstitial : PRODUCTION_ADS.interstitial,
+          isTesting: debug,
         });
         return true;
       } catch (err) {
@@ -108,7 +124,11 @@ export async function initAdMob(): Promise<void> {
   if (!isNative() || _initialised) return;
   try {
     const AdMob = await getAdMob();
-    await AdMob.initialize({ testingDevices: [], initializeForTesting: false });
+    const debug = await getDebugBuild();
+    await AdMob.initialize({
+      testingDevices: [],
+      initializeForTesting: debug,
+    });
     _initialised = true;
     console.log("[AdMob] initialized");
     // Warm the cache — don't await; let it load in the background.
@@ -123,15 +143,17 @@ export async function initAdMob(): Promise<void> {
 export async function showNativeBanner(): Promise<void> {
   if (!isNative()) return;
   try {
+    await initAdMob();
+    const debug = await getDebugBuild();
     const { AdMob, BannerAdSize, BannerAdPosition } = await import(
       "@capacitor-community/admob"
     );
     await AdMob.showBanner({
-      adId: AD_UNIT_BANNER,
+      adId: debug ? TEST_ADS.banner : PRODUCTION_ADS.banner,
       adSize: BannerAdSize.ADAPTIVE_BANNER, // higher eCPM + fill than fixed 320×50
       position: BannerAdPosition.BOTTOM_CENTER,
       margin: 68, // sit above the 68 px tab bar
-      isTesting: false,
+      isTesting: debug,
     });
   } catch (err) {
     console.warn("[AdMob] banner show failed:", err);
@@ -154,6 +176,7 @@ export async function showNativeInterstitial(): Promise<void> {
 
   const handles: Promise<ListenerHandle>[] = [];
   try {
+    await initAdMob();
     // Wait (bounded) for the pre-loaded ad, or start a load now.
     const ready = await withTimeout(preloadInterstitial(), AD_TIMEOUT_MS, false);
     if (!ready) return; // no ad available — never block the user

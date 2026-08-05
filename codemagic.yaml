@@ -14,9 +14,9 @@ workflows:
         # Team → Global variables & secrets → Group name: keystore_credentials
         # Variables inside the group:
         #   CM_KEYSTORE          — base64-encoded PKCS12 keystore file
-        #   CM_KEYSTORE_PASSWORD — store password (ScanPro2024)
-        #   CM_KEY_ALIAS         — key alias (scannerpro)
-        #   CM_KEY_PASSWORD      — key password (ScanPro2024)
+        #   CM_KEYSTORE_PASSWORD — store password
+        #   CM_KEY_ALIAS         — key alias
+        #   CM_KEY_PASSWORD      — key password
         - keystore_credentials
 
     # Only cache safe, portable artifacts (downloaded JARs + pnpm packages).
@@ -45,31 +45,48 @@ workflows:
       - name: Install dependencies
         script: |
           set -euo pipefail
-          # --no-frozen-lockfile: pnpm 9 rejects a lockfile written by pnpm 10
-          pnpm install --no-frozen-lockfile
+          # The lockfile is version 9 and is reproducible with pnpm 9.
+          # Fail instead of silently changing dependency versions in CI.
+          pnpm install --frozen-lockfile
 
-      # ── 3. Build the Vite web app ─────────────────────────────────────────
+      # ── 3. Type-check the application ──────────────────────────────────────
+      - name: Type-check application
+        script: |
+          set -euo pipefail
+          pnpm --filter @workspace/qr-scanner run typecheck
+
+      # ── 4. Build the Vite web app ─────────────────────────────────────────
       - name: Build web assets
         script: |
           set -euo pipefail
           cd artifacts/qr-scanner
           PORT=3000 BASE_PATH=./ pnpm run build
 
-      # ── 4. Copy web assets into the Android project ───────────────────────
+      # ── 5. Copy web assets into the Android project ───────────────────────
       - name: Capacitor sync
         script: |
           set -euo pipefail
           cd artifacts/qr-scanner
           pnpm exec cap sync android
 
-      # ── 5. Write keystore to disk ─────────────────────────────────────────
+      # ── 6. Write and verify the keystore ──────────────────────────────────
       - name: Set up keystore
         script: |
           set -euo pipefail
-          echo "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/release.keystore"
-          echo "Keystore written: $(wc -c < "$CM_BUILD_DIR/release.keystore") bytes"
+          : "${CM_KEYSTORE:?CM_KEYSTORE is missing}"
+          : "${CM_KEYSTORE_PASSWORD:?CM_KEYSTORE_PASSWORD is missing}"
+          : "${CM_KEY_ALIAS:?CM_KEY_ALIAS is missing}"
+          : "${CM_KEY_PASSWORD:?CM_KEY_PASSWORD is missing}"
+          printf '%s' "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/release.keystore"
+          test -s "$CM_BUILD_DIR/release.keystore"
+          keytool -list \
+            -keystore "$CM_BUILD_DIR/release.keystore" \
+            -storetype PKCS12 \
+            -storepass "$CM_KEYSTORE_PASSWORD" \
+            -alias "$CM_KEY_ALIAS" >/dev/null
+          echo "Keystore and alias verified"
 
-      # ── 6. Build signed AAB + APK ─────────────────────────────────────────
+      # ── 7. Build signed AAB + release APK ─────────────────────────────────
       # Both tasks run in a single Gradle invocation so all compilation work
       # (compileReleaseJavaWithJavac, mergeReleaseResources, dexRelease, etc.)
       # is shared between them.  The extra cost over AAB-only is just the final
@@ -97,19 +114,44 @@ workflows:
           cd artifacts/qr-scanner/android
           chmod +x gradlew
 
-          # bundleRelease  → app-release.aab        (Play Store submission)
-          # assembleRelease → app-release.apk        (signed release APK)
-          # assembleDebug   → app-debug.apk          (debug APK — guaranteed sideload)
-          #
-          # All three tasks share the same compilation graph (no double-compile).
-          # assembleDebug uses the auto-generated debug keystore so no extra
-          # signing flags are needed; it will always install cleanly on any device.
-          ./gradlew bundleRelease assembleRelease assembleDebug --no-daemon \
+          ./gradlew clean bundleRelease assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$CM_BUILD_DIR/release.keystore" \
             -Pandroid.injected.signing.store.password="$CM_KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$CM_KEY_PASSWORD" \
             -Pandroid.injected.signing.store.type=PKCS12
+
+      # ── 8. Build debug APK independently ──────────────────────────────────
+      # Do not pass release signing injection to this task. This guarantees
+      # app-debug.apk is signed with Android's standard debug key.
+      - name: Build Android debug APK
+        script: |
+          set -euo pipefail
+          cd artifacts/qr-scanner/android
+          ./gradlew assembleDebug --no-daemon
+
+      # ── 9. Verify all packaged artifacts ──────────────────────────────────
+      - name: Verify Android artifacts
+        script: |
+          set -euo pipefail
+          AAB="artifacts/qr-scanner/android/app/build/outputs/bundle/release/app-release.aab"
+          RELEASE_APK="artifacts/qr-scanner/android/app/build/outputs/apk/release/app-release.apk"
+          DEBUG_APK="artifacts/qr-scanner/android/app/build/outputs/apk/debug/app-debug.apk"
+
+          for artifact in "$AAB" "$RELEASE_APK" "$DEBUG_APK"; do
+            test -s "$artifact"
+            unzip -tq "$artifact" >/dev/null
+            echo "Verified archive: $artifact ($(wc -c < "$artifact") bytes)"
+          done
+
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/$(ls "$ANDROID_SDK_ROOT/build-tools" | sort -V | tail -1)/apksigner"
+          "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$DEBUG_APK"
+
+          # Capacitor web assets must be present inside both APKs.
+          unzip -l "$RELEASE_APK" | grep -q 'assets/public/index.html'
+          unzip -l "$DEBUG_APK" | grep -q 'assets/public/index.html'
+          echo "All Android artifacts and embedded web assets verified"
 
     artifacts:
       - artifacts/qr-scanner/android/app/build/outputs/bundle/release/*.aab
